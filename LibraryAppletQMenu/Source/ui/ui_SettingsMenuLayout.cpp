@@ -8,7 +8,7 @@
 #include <am/am_LibraryApplet.hpp>
 
 extern ui::QMenuApplication::Ref qapp;
-extern cfg::ProcessedTheme theme;
+extern cfg::Theme theme;
 extern cfg::Config config;
 
 namespace ui
@@ -39,7 +39,7 @@ namespace ui
 
     SettingsMenuLayout::SettingsMenuLayout()
     {
-        this->SetBackgroundImage(cfg::ProcessedThemeResource(theme, "ui/Background.png"));
+        this->SetBackgroundImage(cfg::GetAssetByTheme(theme, "ui/Background.png"));
 
         pu::ui::Color textclr = pu::ui::Color::FromHex(qapp->GetUIConfigValue<std::string>("text_color", "#e1e1e1ff"));
         pu::ui::Color menufocusclr = pu::ui::Color::FromHex(qapp->GetUIConfigValue<std::string>("menu_focus_color", "#5ebcffff"));
@@ -86,6 +86,34 @@ namespace ui
         setGetLanguageCode(&lcode);
         setMakeLanguage(lcode, &ilang);
         this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_console_lang"), EncodeForSettings(os::LanguageNames[ilang]), 4);
+        bool console_info_upload = false;
+        setsysGetFlag(SetSysFlag_ConsoleInformationUpload, &console_info_upload);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_console_info_upload"), EncodeForSettings(console_info_upload), 5);
+        bool auto_titles_dl = false;
+        setsysGetFlag(SetSysFlag_AutomaticApplicationDownload, &auto_titles_dl);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_auto_titles_dl"), EncodeForSettings(auto_titles_dl), 6);
+        bool auto_update = false;
+        setsysGetFlag(SetSysFlag_AutoUpdateEnable, &auto_update);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_auto_update"), EncodeForSettings(auto_update), 7);
+        bool wireless_lan = false;
+        setsysGetFlag(SetSysFlag_WirelessLanEnable, &wireless_lan);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_wireless_lan"), EncodeForSettings(wireless_lan), 8);
+        bool bluetooth = false;
+        setsysGetFlag(SetSysFlag_BluetoothEnable, &bluetooth);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_bluetooth"), EncodeForSettings(bluetooth), 9);
+        bool usb_30 = false;
+        setsysGetFlag(SetSysFlag_Usb30Enable, &usb_30);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_usb_30"), EncodeForSettings(usb_30), 10);
+        bool nfc = false;
+        setsysGetFlag(SetSysFlag_NfcEnable, &nfc);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_nfc"), EncodeForSettings(nfc), 11);
+        char serial[0x20] = {0};
+        setsysGetSerialNumber(serial);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_serial_no"), EncodeForSettings<std::string>(serial), -1);
+        u64 mac = 0;
+        net::GetMACAddress(&mac);
+        auto strmac = net::FormatMACAddress(mac);
+        this->PushSettingItem(cfg::GetLanguageString(config.main_lang, config.default_lang, "set_mac_addr"), EncodeForSettings(strmac), -1);
     }
 
     void SettingsMenuLayout::PushSettingItem(std::string name, std::string value_display, int id)
@@ -93,7 +121,7 @@ namespace ui
         pu::ui::Color textclr = pu::ui::Color::FromHex(qapp->GetUIConfigValue<std::string>("text_color", "#e1e1e1ff"));
         auto itm = pu::ui::elm::MenuItem::New(name + ": " + value_display);
         itm->AddOnClick(std::bind(&SettingsMenuLayout::setting_Click, this, id));
-        itm->SetIcon(cfg::ProcessedThemeResource(theme, "ui/Setting" + std::string((id < 0) ? "No" : "") + "Editable.png"));
+        itm->SetIcon(cfg::GetAssetByTheme(theme, "ui/Setting" + std::string((id < 0) ? "No" : "") + "Editable.png"));
         itm->SetColor(textclr);
         this->settingsMenu->AddItem(itm);
     }
@@ -149,7 +177,7 @@ namespace ui
                 *(u32*)in = 1; // 0 = normal, 1 = qlaunch, 2 = starter?
                 u8 out[8] = {0};
 
-                am::LibraryAppletQMenuLaunchAnd(AppletId_netConnect, 0, in, sizeof(in), out, sizeof(out), [&]() -> bool
+                am::LibraryAppletQMenuLaunchWithSimple(AppletId_netConnect, 0, in, sizeof(in), out, sizeof(out), [&]() -> bool
                 {
                     return !am::QMenuIsHomePressed();
                 });
@@ -165,6 +193,69 @@ namespace ui
                 qapp->LoadSettingsLanguagesMenu();
                 qapp->FadeIn();
 
+                break;
+            }
+            case 5:
+            {
+                bool console_info_upload = false;
+                setsysGetFlag(SetSysFlag_ConsoleInformationUpload, &console_info_upload);
+                setsysSetFlag(SetSysFlag_ConsoleInformationUpload, !console_info_upload);
+
+                reload_need = true;
+                break;
+            }
+            case 6:
+            {
+                bool auto_titles_dl = false;
+                setsysGetFlag(SetSysFlag_AutomaticApplicationDownload, &auto_titles_dl);
+                setsysSetFlag(SetSysFlag_AutomaticApplicationDownload, !auto_titles_dl);
+
+                reload_need = true;
+                break;
+            }
+            case 7:
+            {
+                bool auto_update = false;
+                setsysGetFlag(SetSysFlag_AutoUpdateEnable, &auto_update);
+                setsysSetFlag(SetSysFlag_AutoUpdateEnable, !auto_update);
+
+                reload_need = true;
+                break;
+            }
+            case 8:
+            {
+                bool wireless_lan = false;
+                setsysGetFlag(SetSysFlag_WirelessLanEnable, &wireless_lan);
+                setsysSetFlag(SetSysFlag_WirelessLanEnable, !wireless_lan);
+
+                reload_need = true;
+                break;
+            }
+            case 9:
+            {
+                bool bluetooth = false;
+                setsysGetFlag(SetSysFlag_BluetoothEnable, &bluetooth);
+                setsysSetFlag(SetSysFlag_BluetoothEnable, !bluetooth);
+
+                reload_need = true;
+                break;
+            }
+            case 10:
+            {
+                bool usb_30 = false;
+                setsysGetFlag(SetSysFlag_Usb30Enable, &usb_30);
+                setsysSetFlag(SetSysFlag_Usb30Enable, !usb_30);
+
+                reload_need = true;
+                break;
+            }
+            case 11:
+            {
+                bool nfc = false;
+                setsysGetFlag(SetSysFlag_NfcEnable, &nfc);
+                setsysSetFlag(SetSysFlag_NfcEnable, !nfc);
+
+                reload_need = true;
                 break;
             }
         }
