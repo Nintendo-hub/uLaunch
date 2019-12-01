@@ -64,10 +64,10 @@ namespace ui
         this->users->SetOnClick(std::bind(&MenuLayout::users_Click, this));
         qapp->ApplyConfigForElement("main_menu", "user_icon", this->users);
         this->Add(this->users);
-        this->web = ClickableImage::New(340, 53, cfg::GetAssetByTheme(theme, "ui/WebIcon.png"));
-        this->web->SetOnClick(std::bind(&MenuLayout::web_Click, this));
-        qapp->ApplyConfigForElement("main_menu", "web_icon", this->web);
-        this->Add(this->web);
+        this->controller = ClickableImage::New(340, 53, cfg::GetAssetByTheme(theme, "ui/ControllerIcon.png"));
+        this->controller->SetOnClick(std::bind(&MenuLayout::controller_Click, this));
+        qapp->ApplyConfigForElement("main_menu", "controller_icon", this->controller);
+        this->Add(this->controller);
 
         auto curtime = util::GetCurrentTime();
         this->timeText = pu::ui::elm::TextBlock::New(515, 68, curtime);
@@ -126,13 +126,13 @@ namespace ui
         this->quickMenu = QuickMenu::New(cfg::GetAssetByTheme(theme, "ui/QuickMenuMain.png"));
 
         this->quickMenu->SetEntry(QuickMenuDirection::Up, cfg::GetAssetByTheme(theme, "ui/UserIcon.png"), std::bind(&MenuLayout::users_Click, this));
-        this->quickMenu->SetEntry(QuickMenuDirection::Down, cfg::GetAssetByTheme(theme, "ui/SettingsIcon.png"), std::bind(&MenuLayout::settings_Click, this));
-        this->quickMenu->SetEntry(QuickMenuDirection::Left, cfg::GetAssetByTheme(theme, "ui/WebIcon.png"), std::bind(&MenuLayout::web_Click, this));
+        this->quickMenu->SetEntry(QuickMenuDirection::UpLeft, cfg::GetAssetByTheme(theme, "ui/PowerIcon.png"), std::bind(&MenuLayout::HandlePowerDialog, this));
+        this->quickMenu->SetEntry(QuickMenuDirection::UpRight, cfg::GetAssetByTheme(theme, "ui/SettingsIcon.png"), std::bind(&MenuLayout::settings_Click, this));
+        this->quickMenu->SetEntry(QuickMenuDirection::Left, cfg::GetAssetByTheme(theme, "ui/ControllerIcon.png"), std::bind(&MenuLayout::controller_Click, this));
         this->quickMenu->SetEntry(QuickMenuDirection::Right, cfg::GetAssetByTheme(theme, "ui/ThemesIcon.png"), std::bind(&MenuLayout::themes_Click, this));
-        this->quickMenu->SetEntry(QuickMenuDirection::UpLeft, cfg::GetAssetByTheme(theme, "ui/ControllerIcon.png"), std::bind(&MenuLayout::HandleControllerAppletOpen, this));
-        this->quickMenu->SetEntry(QuickMenuDirection::UpRight, cfg::GetAssetByTheme(theme, "ui/AlbumIcon.png"), std::bind(&MenuLayout::HandleOpenAlbum, this));
-        this->quickMenu->SetEntry(QuickMenuDirection::DownLeft, cfg::GetAssetByTheme(theme, "ui/PowerIcon.png"), std::bind(&MenuLayout::HandlePowerDialog, this));
-        this->quickMenu->SetEntry(QuickMenuDirection::DownRight, cfg::GetAssetByTheme(theme, "ui/HelpIcon.png"), std::bind(&MenuLayout::HandleShowHelp, this));
+        this->quickMenu->SetEntry(QuickMenuDirection::DownLeft, cfg::GetAssetByTheme(theme, "ui/WebIcon.png"), std::bind(&MenuLayout::HandleWebPageOpen, this));
+        this->quickMenu->SetEntry(QuickMenuDirection::DownRight, cfg::GetAssetByTheme(theme, "ui/AlbumIcon.png"), std::bind(&MenuLayout::HandleOpenAlbum, this));
+        this->quickMenu->SetEntry(QuickMenuDirection::Down, cfg::GetAssetByTheme(theme, "ui/HelpIcon.png"), std::bind(&MenuLayout::HandleShowHelp, this));
 
         this->Add(this->quickMenu);
 
@@ -292,6 +292,7 @@ namespace ui
                 {
                     if(down & KEY_A)
                     {
+                        pu::audio::Play(this->sfxTitleLaunch);
                         am::QMenuCommandWriter writer(am::QDaemonMessage::LaunchHomebrewLibApplet);
                         hb::TargetInput ipt = {};
                         strcpy(ipt.nro_path, "sdmc:/hbmenu.nro"); // Launch normal hbmenu
@@ -299,7 +300,6 @@ namespace ui
                         writer.Write<hb::TargetInput>(ipt);
                         writer.FinishWrite();
 
-                        pu::audio::Play(this->sfxTitleLaunch);
                         qapp->StopPlayBGM();
                         qapp->CloseWithFadeOut();
                         return;
@@ -401,6 +401,7 @@ namespace ui
                                     if((cfg::TitleType)title.title_type == cfg::TitleType::Homebrew) this->HandleHomebrewLaunch(title);
                                     else
                                     {
+                                        pu::audio::Play(this->sfxTitleLaunch);
                                         am::QMenuCommandWriter writer(am::QDaemonMessage::LaunchApplication);
                                         writer.Write<u64>(title.app_id);
                                         writer.FinishWrite();
@@ -408,7 +409,6 @@ namespace ui
                                         am::QMenuCommandResultReader reader;
                                         if(reader && R_SUCCEEDED(reader.GetReadResult()))
                                         {
-                                            pu::audio::Play(this->sfxTitleLaunch);
                                             qapp->StopPlayBGM();
                                             qapp->CloseWithFadeOut();
                                             return;
@@ -542,8 +542,8 @@ namespace ui
                 if((cfg::TitleType)title.title_type == cfg::TitleType::Homebrew) this->bannerImage->SetImage(cfg::GetAssetByTheme(theme, "ui/BannerHomebrew.png"));
                 else this->bannerImage->SetImage(cfg::GetAssetByTheme(theme, "ui/BannerInstalled.png"));
             }
+            if(!this->curfolder.empty()) this->bannerImage->SetImage(cfg::GetAssetByTheme(theme, "ui/BannerFolder.png")); // This way user always knows he's inside a folder
         }
-        if(!this->curfolder.empty()) this->bannerImage->SetImage(cfg::GetAssetByTheme(theme, "ui/BannerFolder.png")); // This way user always knows he's inside a folder
     }
 
     void MenuLayout::MoveFolder(std::string name, bool fade)
@@ -604,6 +604,8 @@ namespace ui
 
     void MenuLayout::OnInput(u64 down, u64 up, u64 held, pu::ui::Touch pos)
     {
+        qapp->CommonMenuOnLoop();
+
         auto quickon = this->quickMenu->IsOn();
         this->itemsMenu->SetEnabled(!quickon);
         if(quickon) return;
@@ -719,10 +721,11 @@ namespace ui
 
         if(down & KEY_B)
         {
-            if(!this->curfolder.empty()) this->MoveFolder("", true);
+            if(!this->curfolder.empty() && !this->homebrew_mode) this->MoveFolder("", true);
         }
         else if(down & KEY_PLUS) this->logo_Click();
         else if(down & KEY_MINUS) this->menuToggle_Click();
+        else if((down & KEY_L) || (down & KEY_R) || (down & KEY_ZL) || (down & KEY_ZR) || (down & KEY_LSTICK) || (down & KEY_RSTICK)) this->quickMenu->Toggle();
     }
 
     void MenuLayout::SetUser(u128 user)
@@ -765,9 +768,9 @@ namespace ui
         this->HandleUserMenu();
     }
 
-    void MenuLayout::web_Click()
+    void MenuLayout::controller_Click()
     {
-        this->HandleWebPageOpen();
+        this->HandleControllerAppletOpen();
     }
 
     void MenuLayout::HandleCloseSuspended()
@@ -796,6 +799,7 @@ namespace ui
         else launchmode = 1;
         if(launchmode == 1)
         {
+            pu::audio::Play(this->sfxTitleLaunch);
             hb::TargetInput ipt = {};
             strcpy(ipt.nro_path, rec.nro_target.nro_path);
             strcpy(ipt.argv, rec.nro_target.nro_path);
@@ -805,7 +809,6 @@ namespace ui
             writer.Write<hb::TargetInput>(ipt);
             writer.FinishWrite();
 
-            pu::audio::Play(this->sfxTitleLaunch);
             qapp->StopPlayBGM();
             qapp->CloseWithFadeOut();
             return;
@@ -821,6 +824,7 @@ namespace ui
             }
             if(launch)
             {
+                pu::audio::Play(this->sfxTitleLaunch);
                 hb::TargetInput ipt = {};
                 strcpy(ipt.nro_path, rec.nro_target.nro_path);
                 strcpy(ipt.argv, rec.nro_target.nro_path);
@@ -833,7 +837,6 @@ namespace ui
                 am::QMenuCommandResultReader reader;
                 if(reader && R_SUCCEEDED(reader.GetReadResult()))
                 {
-                    pu::audio::Play(this->sfxTitleLaunch);
                     qapp->StopPlayBGM();
                     qapp->CloseWithFadeOut();
                     return;
